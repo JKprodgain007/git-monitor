@@ -1,0 +1,89 @@
+name: Repository Monitor
+
+on:
+  push:
+  pull_request:
+    types: [opened, closed, reopened]
+  create:
+  delete:
+  issues:
+    types: [opened, closed, reopened]
+  issue_comment:
+    types: [created]
+  watch:
+    types: [started]
+  fork:
+  release:
+    types: [published]
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Send to Google Chat
+      env:
+        GOOGLE_CHAT_WEBHOOK: ${{ secrets.GOOGLE_CHAT_WEBHOOK }}
+      run: |
+        EVENT_TYPE="${{ github.event_name }}"
+        REPO="${{ github.repository }}"
+        ACTOR="${{ github.actor }}"
+        
+        case $EVENT_TYPE in
+          push)
+            MESSAGE="🔨 New push to $REPO by $ACTOR\n
+            Branch: ${{ github.ref_name }}\n
+            Commit: ${{ github.sha }}\n
+            Message: ${{ github.event.head_commit.message }}\n
+            URL: ${{ github.event.head_commit.url }}"
+            ;;
+          pull_request)
+            PR_ACTION="${{ github.event.action }}"
+            PR_TITLE="${{ github.event.pull_request.title }}"
+            PR_URL="${{ github.event.pull_request.html_url }}"
+            MESSAGE="🔀 Pull Request $PR_ACTION in $REPO by $ACTOR\n
+            Title: $PR_TITLE\n
+            URL: $PR_URL"
+            ;;
+          create | delete)
+            REF_TYPE="${{ github.event.ref_type }}"
+            REF="${{ github.event.ref }}"
+            MESSAGE="🏷️ $REF_TYPE $REF $EVENT_TYPE in $REPO by $ACTOR"
+            ;;
+          issues)
+            ISSUE_ACTION="${{ github.event.action }}"
+            ISSUE_TITLE="${{ github.event.issue.title }}"
+            ISSUE_URL="${{ github.event.issue.html_url }}"
+            MESSAGE="📌 Issue $ISSUE_ACTION in $REPO by $ACTOR\n
+            Title: $ISSUE_TITLE\n
+            URL: $ISSUE_URL"
+            ;;
+          issue_comment)
+            ISSUE_TITLE="${{ github.event.issue.title }}"
+            COMMENT_URL="${{ github.event.comment.html_url }}"
+            MESSAGE="💬 New comment on issue in $REPO by $ACTOR\n
+            Issue: $ISSUE_TITLE\n
+            Comment URL: $COMMENT_URL"
+            ;;
+          watch)
+            MESSAGE="⭐ $REPO starred by $ACTOR"
+            ;;
+          fork)
+            FORK_URL="${{ github.event.forkee.html_url }}"
+            MESSAGE="🍴 $REPO forked by $ACTOR\n
+            Fork URL: $FORK_URL"
+            ;;
+          release)
+            RELEASE_NAME="${{ github.event.release.name }}"
+            RELEASE_URL="${{ github.event.release.html_url }}"
+            MESSAGE="🚀 New release published for $REPO by $ACTOR\n
+            Release: $RELEASE_NAME\n
+            URL: $RELEASE_URL"
+            ;;
+          *)
+            MESSAGE="🔔 Unhandled event $EVENT_TYPE occurred in $REPO"
+            ;;
+        esac
+        
+        curl -X POST -H "Content-Type: application/json" -d "{
+          \"text\": \"$MESSAGE\"
+        }" $GOOGLE_CHAT_WEBHOOK
