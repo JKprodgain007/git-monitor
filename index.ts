@@ -23,6 +23,7 @@ const GOOGLE_CHAT_WEBHOOK_URL = process.env.GOOGLE_CHAT_WEBHOOK_URL;
 //   }>;
 // }
 
+
 interface Commit {
   id: string;
   author: {
